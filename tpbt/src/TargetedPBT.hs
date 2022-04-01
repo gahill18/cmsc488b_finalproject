@@ -7,25 +7,80 @@ Spring 2022
 -}
 
 module TargetedPBT where
-import Test.QuickCheck
-import Data.Graph as Graphs
+
+import Data.List
+
+{-
+Takes in a function to calculate uvs, a function to calculate a set of nearby points from a given point, and an initial guess point.
+Returns (local maximum, corresponding uv)
+-}
+maximize :: Ord b => (a -> b) -> (a -> [a]) -> a -> (a, b)
+maximize f_uv f_wiggle init =
+  let is = f_wiggle init
+      uvs = map f_uv is
+      l = zip is uvs
+  in tupleMax l
+
+{-
+Takes in a list of tuples, of which the second type needs to be orderable in order to sort.
+Returns the tuple with the largest second value.
+-}
+tupleMax :: Ord b => [(a, b)] -> (a, b)
+tupleMax [] = error "tupleMax passed empty list!"
+tupleMax [x] = x
+tupleMax ((a,b):t) = let (a',b') = tupleMax t in
+  if b < b' then (a',b')
+  else (a,b)
 
 
-sut = undefined
+{-
+Takes in a function to calculate uvs, a function to calculate a set of nearby points from a given point, and an initial guess point.
+Returns (local minimum, corresponding uv)
+-}
+minimize :: Ord b => (a -> b) -> (a -> [a]) -> a -> (a, b)
+minimize f_uv f_wiggle init =
+  let is = f_wiggle init
+      uvs = map f_uv is
+      l = zip is uvs
+  in tupleMin l
 
+{-
+Takes in a list of tuples, of which the second type needs to be orderable in order to sort.
+Returns the tuple with the lowest second value.
+-}
+tupleMin :: Ord b => [(a, b)] -> (a, b)
+tupleMin [] = error "tupleMin passed empty list!"
+tupleMin [x] = x
+tupleMin ((a,b):t) = let (a',b') = tupleMin t in
+  if b > b' then (a',b')
+  else (a,b)
 
-prop_length :: Graph g -> Property
-prop_length g =
-  counterexample "wrong length!" all lenLam (vertices g)
-  where
-    lenLam = \v -> distanceFromSink v < 21
-    distanceFromSink = undefined
+sampleUV :: Int -> Int
+sampleUV i = (10 - i) ^ 2
 
-prop_length_hc :: Graph g -> Property
-prop_length_hc = 
+sampleWiggle :: Int -> [Int]
+sampleWiggle i = [(i - 10) .. (i + 10)]
 
+gradientDescent :: (Int -> Int) -> (Int -> [Int]) -> Int -> Int -> (Int, Int)
+gradientDescent f_uv f_wiggle i 0 = (i, f_uv i)
+gradientDescent f_uv f_wiggle i gas =
+  let (new_i,new_uv) = minimize f_uv f_wiggle i in
+    if new_uv == f_uv i then (new_i,new_uv)
+    else gradientDescent f_uv f_wiggle new_i (gas - 1)
+
+sampleGD i g = gradientDescent sampleUV sampleWiggle i g
 
 {- Code to reimplement
+
+
+prop_length_hc() ->
+  ?TARGET_STRATEGY(hill_climbing,
+    ?FORALL(X, ?TARGET(graph_hc(42)),
+            begin
+              UV = lists:max(distance_from_sink(G)),
+              ?MAXIMIZE(UV),
+              UV < 21
+            end))
 
 prop_Target() -> % Try to check a property
   ?TARGET_STRATEGY(SearchStrategy, % for some Search Strategy
@@ -36,14 +91,6 @@ prop_Target() -> % Try to check a property
               UV < Threshold % up to some Threshold.
             end)).
 
-prop_length_hc() ->
-  ?TARGET_STRATEGY(hill_climbing,
-    ?FORALL(X, ?TARGET(graph_hc(42)),
-            begin
-              UV = lists:max(distance_from_sink(G)),
-              ?MAXIMIZE(UV),
-              UV < 21
-            end))
 
 graph_hc(N) ->
   #{first => graph(N), next => fun graph_next/1}
