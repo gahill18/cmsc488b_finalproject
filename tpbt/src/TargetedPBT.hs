@@ -58,10 +58,17 @@ tupleMin ((a,b):t) = let (a',b') = tupleMin t in
 sampleUV :: Int -> Int
 sampleUV i = (10 - i) ^ 2
 
+-- Wiggle is a neighborhood function
+-- It produces a series of 'nearby 'data points
 sampleWiggle :: Int -> [Int]
 sampleWiggle i = [(i - 10) .. (i + 10)]
 
-gradientDescent :: (Int -> Int) -> (Int -> [Int]) -> Int -> Int -> (Int, Int)
+{-
+Takes a uv function, a wiggle function, an initial guess, and a gas level
+(number of steps before termination).
+Returns (a local minimum, associated uv value)
+-}
+gradientDescent :: Ord b => (a -> b) -> (a -> [a]) -> a -> Int -> (a, b)
 gradientDescent f_uv f_wiggle i 0 = (i, f_uv i)
 gradientDescent f_uv f_wiggle i gas =
   let (new_i,new_uv) = minimize f_uv f_wiggle i in
@@ -69,6 +76,20 @@ gradientDescent f_uv f_wiggle i gas =
     else gradientDescent f_uv f_wiggle new_i (gas - 1)
 
 sampleGD i g = gradientDescent sampleUV sampleWiggle i g
+
+{-
+consider doing decision trees on binary function to
+determine how to beat wordle
+
+experiment with expanding gradient descent to accept functions
+with unlimited arguments
+
+roadmap:
+implement typeclass to demonstrate properties
+- need to include utility function and neighborhood function
+- implement arbitrary so that you can generate instances of the objects
+- for every test that quickcheck generates an arbitrary instance for, gradientDescent to check nearby points for higher likelhihood to fail
+-}
 
 {- Code to reimplement
 
