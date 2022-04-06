@@ -67,11 +67,11 @@ local minimum has been found by that point.
 Returns (a local minimum, associated utility value).
 -}
 gradientDescent :: Ord b => (a -> b) -> (a -> [a]) -> a -> Int -> (a, b)
-gradientDescent f_uv f_wiggle i 0 = (i, f_uv i)
-gradientDescent f_uv f_wiggle i gas =
+gradientDescent f_uv f_wiggle i gas | gas > 0 =
   let (new_i,new_uv) = minimize f_uv f_wiggle i in
     if new_uv == f_uv i then (new_i,new_uv)
     else gradientDescent f_uv f_wiggle new_i (gas - 1)
+gradientDescent f_uv f_wiggle i _ = (i, f_uv i)
 
 {-
 Takes a uv function, a neighborhood (wiggle) function, an initial guess,
@@ -80,11 +80,11 @@ local maximum has been found by that point.
 Returns (a local maximum, associated utility value).
 -}
 gradientAscent :: Ord b => (a -> b) -> (a -> [a]) -> a -> Int -> (a, b)
-gradientAscent f_uv f_wiggle i 0 = (i, f_uv i)
-gradientAscent f_uv f_wiggle i gas =
+gradientAscent f_uv f_wiggle i gas | gas > 0=
   let (new_i,new_uv) = maximize f_uv f_wiggle i in
     if new_uv == f_uv i then (new_i,new_uv)
     else gradientAscent f_uv f_wiggle new_i (gas - 1)
+gradientAscent f_uv f_wiggle i _ = (i, f_uv i)
 
 
 {-
@@ -98,6 +98,7 @@ sampleUV :: Int -> Int -- a = Int, b = Int from gradientDescent
 sampleUV i = (10 - i) ^ 2 -- (how far i is from 10) squared
 
 prop_sampleUVPosNegEqual :: Int -> Property
+-- any value that is x distance away from 10 should produce the same uv, whether greater or less than 10
 prop_sampleUVPosNegEqual i = counterexample "pos/neg distance not equal" $ sampleUV (10-i) == sampleUV (10+i)
 
 
@@ -111,12 +112,27 @@ sampleWiggle wiggleDistance i = [(i - wiggleDistance) .. (i + wiggleDistance)]
 
 
 prop_sampleWiggleDist :: Int -> Int -> Property
-prop_sampleWiggleDist i d = counterexample ((show i) ++ " wiggled farther than " ++ (show d)) $
+-- all values in the sample wiggle distance should be less than the randomly chosen wiggle distance away from i
+prop_sampleWiggleDist d i = counterexample ((show i) ++ " wiggled farther than " ++ (show d)) $
   all (\x -> abs (x - i) <= d) (sampleWiggle d i)
 
 
--- give an initial integer guess i, and a step count g, run the gradient descent in these samples
+-- give an initial integer guess i, and a step count g, run the gradient descent for i,g
+-- this example uses the numbers within +/- 10 of i for its neighborhood function
+sampleGD :: Int -> Int -> (Int, Int)
 sampleGD i g = gradientDescent sampleUV (sampleWiggle 10) i g
+
+
+prop_sampleGDCloseEnoughAnswer :: Int -> Int -> Property
+-- If gas > 0, the new_i should be within gas*10 of the value 10
+prop_sampleGDCloseEnoughAnswer i g | g > 0 = let (new_i, new_uv) = sampleGD i g in
+  counterexample ("new_i: " ++ (show new_i) ++ ", new_uv: " ++ (show new_uv) ++ ", g: " ++ (show g)) $
+  (10 - new_i) `div` 10 <= g
+-- if gas <= 0, then new_i should equal the original i
+prop_sampleGDCloseEnoughAnswer i g = let (new_i, new_uv) = sampleGD i g in
+  counterexample ("new_i: " ++ (show new_i) ++ ", new_uv: " ++ (show new_uv) ++ ", g: " ++ (show g)) $
+  (new_i == i)
+  
 
 {-
 experiment with expanding gradient descent to accept functions
