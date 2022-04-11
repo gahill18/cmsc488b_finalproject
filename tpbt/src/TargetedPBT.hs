@@ -20,6 +20,7 @@ import Test.QuickCheck
 
 
 ------ FUNCTIONS WE ACTUALLY CARE ABOUT FOR THE LIBRARY
+
 {-
 Quickchecks the property using targeted PBT: for every randomized data point,
 look around for values "more likely" to fail based on the UV function, and
@@ -57,6 +58,10 @@ tqc_min f_uv f_wiggle threshold gas
     let (new_i, new_uv) = gradientDescent f_uv f_wiggle i gas in
       new_uv <= threshold
   | otherwise = putStrLn "error in tqc_min: gas must be > 0!"
+
+
+
+
 
 ----- HELPER FUNCTIONS -------
 
@@ -193,7 +198,9 @@ testAll = do
 
 
 {-
-Haskell IFC
+Haskell IFC:
+https://arxiv.org/pdf/1409.0393.pdf
+https://github.com/QuickChick/TestingNoninterference
 
 potential typeclass: wordle representation
 fields:

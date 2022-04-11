@@ -198,7 +198,9 @@ testAll = do
 
 
 {-
-Haskell IFC
+Haskell IFC:
+https://arxiv.org/pdf/1409.0393.pdf
+https://github.com/QuickChick/TestingNoninterference
 
 potential typeclass: wordle representation
 fields:
