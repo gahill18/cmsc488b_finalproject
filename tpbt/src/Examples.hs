@@ -6,9 +6,39 @@ Spring 2022
 
 -}
 
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+
+
 module Examples where
 
 import TargetedPBT
+import Control.Lens
+
+data Wordle = Turn {
+  _guess :: [Char],
+  _green :: [(Char, Int)],
+  _yellow :: [Char],
+  _grey :: [Char]
+  }
+
+makeLenses ''Wordle
+
+instance Arbitrary Wordle where
+  arbitrary = Turn {
+    _guess = (arbitrary :: [Char]),
+    _green = [],
+    _yellow = [],
+    _grey = []
+    }
+
+
+
+main :: IO ()
+main = do
+  print "hi mom"
 
 {-
 Haskell IFC:
