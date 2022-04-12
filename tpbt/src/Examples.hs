@@ -15,16 +15,24 @@ Spring 2022
 module Examples where
 
 import TargetedPBT
+import QuickCheck
 import Control.Lens
 
-data Wordle = Turn {
-  _guess :: [Char],
-  _green :: [(Char, Int)],
-  _yellow :: [Char],
-  _grey :: [Char]
-  }
+data (Wordle g) = MkResult {
+    _curr_g      :: [g],
+    _greens      :: [(g, Int)], -- items we know the position of
+    _yellows     :: [g],        -- items we don't know the place of
+    _greys       :: [g],        -- items not in the list
+    _turns_remn  :: Int         -- turns remaining
+}
+
+data (Game g) = MkHistory {
+    _wordle      :: (Wordle g),
+    _key         :: [g]
+}
 
 makeLenses ''Wordle
+makeLenses ''Game
 
 instance Arbitrary Wordle where
   arbitrary = Turn {
