@@ -110,6 +110,10 @@ tupleMin ((a,b):t) = let (a',b') = tupleMin t in
   if b > b' then (a',b')
   else (a,b)
 
+tupleElem :: Eq b => b -> [(b,a)] -> Bool
+tupleElem b [] = False
+tupleElem b1 ((b2,a) : t) = b1 == b2 || tupleElem b2 t
+
 {-
 Takes a uv function, a neighborhood (wiggle) function, an initial guess,
 and a gas level. Gas level is number of steps before termination if no

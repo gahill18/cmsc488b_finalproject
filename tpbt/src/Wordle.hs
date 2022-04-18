@@ -8,7 +8,7 @@ Spring 2022
 
 {-# LANGUAGE TemplateHaskell   #-}
 
-module Examples where
+module Wordle where
 
 import Data.List
 
@@ -41,7 +41,7 @@ wordle_size = 5
 {-
 What utility value function should we use for this example? For these wordles, I will define a reward function
 that values the length of green, the length of yellow, and the length of the grey lists. Mathematically:
-UV(x) = 100 * x.grn.length + 10 * x.yel.length + 1 * x.gry.length
+forall Wordle x: UV(x) = 100 * x.grn.length + 10 * x.yel.length + 1 * x.gry.length
 -}
 
 (grn_weight, yel_weight, gry_weight) = (100,10,1)
