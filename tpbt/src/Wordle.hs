@@ -6,37 +6,129 @@ Spring 2022
 
 -}
 
-{-# LANGUAGE TemplateHaskell   #-}
-
 module Wordle where
 
 import Data.List
+import Data.List.Utils
 
 import TargetedPBT
 import Test.QuickCheck
 
 import Control.Monad
-import Control.Lens
-
 
 ------------- DEFINITIONS/ENGINE ----------------
 
 data Wordle = Wordle {
-    _next_g      :: [Char],        -- what we want to guess next
-    _greens      :: [(Char, Int)], -- chars we know the position of
-    _yellows     :: [Char],        -- chars we don't know the place of
-    _greys       :: [Char],        -- chars not in the key
-    _pool        :: [Char]
+    _c_g         :: String,        -- what we are about to guess
+    _grn         :: [(Char, Int)], -- chars we know the position of
+    _yel         :: [(Char, Int)], -- chars we know exist outside of given positions
+    _gry         :: [Char],        -- chars not in the key
+    _pool        :: [Char]         -- chars left to use
 } deriving (Eq, Show)
 
 data Game = Game {
     _wordle      :: Wordle, -- the wordle trying to guess the key
-    _key         :: [Char], -- the key the wordle is trying to guess
+    _key         :: String, -- the key the wordle is trying to guess
     _turns       :: Int     -- how many turns are left
 } deriving (Eq, Show)
 
 wordle_size :: Int
 wordle_size = 5
+
+game_turns :: Game -> Int -> Game
+game_turns g i | i > 1 = game_turns (game_turn g) (i-1)
+               | i == 1 = game_turn g
+
+-- Steps through one turn of the game
+game_turn :: Game -> Game
+game_turn g = new_guess (guess g)
+
+-- Pick a new guess based on current known info
+-- Key hidden to enforce no peeking
+-- DOES NOT decrease turns
+-- TODO
+new_guess :: Game -> Game
+new_guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
+  | length grn == wordle_size = error "Wordle already solved!"
+  | t > 1 = (Game (non_final_guess w) k t)
+  | t == 1 = (Game (final_guess w) k 0)
+  | otherwise = g
+
+
+non_final_guess :: Wordle -> Wordle
+non_final_guess w@(Wordle c_g grn yel gry pool)
+  | length gry <= 26 - wordle_size =
+      let n_g_pool = [c | c <- pool, not (elem c gry)]
+          n_g = take wordle_size n_g_pool
+      in
+        (Wordle n_g grn yel gry pool)
+  | length yel >= 0 =
+      let n_g_pool = [c | c <- pool, not (elem c gry)]
+          uniq_yel = nub (keysAL yel)
+          uniq_grn = keysAL grn
+          n_g = take wordle_size (n_g_pool ++ uniq_yel ++ uniq_grn)
+      in
+        (Wordle n_g grn yel gry pool)
+  | otherwise = w
+          
+
+final_guess :: Wordle -> Wordle
+final_guess (Wordle c_g grn yel gry pool)
+  | length yel >= 0 =
+    let use_yel = if length (nub $ keysAL yel) > 1 then
+                    take (wordle_size - length grn) (uniq_a yel)
+                  else
+                    take (wordle_size - length grn) yel
+        n_g     = keysAL (sndSort (use_yel ++ grn))
+    in
+      (Wordle n_g grn yel gry pool)
+
+-- Execute the current guess for the game
+-- DOES decrease turns
+-- TODO
+guess :: Game -> Game
+guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
+  | t > 0 =
+    let new_grn  = nub $ grn ++ (ud_grn c_g k 0) 
+        new_gry  = nub $ gry ++ (ud_gry c_g k)
+        new_yel  = nub $ yel ++ (ud_yel c_g k 0 new_grn new_gry)        
+        new_pool = [p | p <- pool, not (elem p new_gry)]
+    in
+      Game (Wordle c_g new_grn new_yel new_gry new_pool) k (t-1)
+  | otherwise = g
+
+
+-- For a guess/key pair and starting index, produce the list of matching chars with index
+ud_grn :: String -> String -> Int -> [(Char, Int)]
+ud_grn (gh:gt) (kh:kt) i =
+  if gh == kh then (gh,i) : (ud_grn gt kt (i+1))
+  else (ud_grn gt kt (i+1))
+ud_grn _ _ _ = []
+
+-- For a guess/key pair and starting index, produce the list of chars that are in the
+-- key but not in the correct position
+ud_yel :: String -> String -> Int -> [(Char, Int)] -> [Char] -> [(Char, Int)]
+ud_yel g k i grn gry =
+  let known_chars = map fst grn
+      known_i     = map snd grn
+  in
+    [(c,i) | c <- g, i <- [0 .. wordle_size],
+             elem c k && not (elem i known_i),
+             (countElem c known_chars <= countElem c k)]
+
+ud_gry :: String -> String -> [Char]
+ud_gry g k = filter (\c -> not (elem c k)) g 
+
+
+---------- TESTING ------------
+
+-- A default Wordle to test with
+def_w :: Wordle
+def_w = Wordle "haskl" [] [] [] ['a' .. 'z']
+
+-- A default Game to test with
+def_g :: Game
+def_g = Game def_w "cabal" 5
 
 {-
 What utility value function should we use for this example? For these wordles, I will define a reward function
@@ -44,83 +136,20 @@ that values the length of green, the length of yellow, and the length of the gre
 forall Wordle x: UV(x) = 100 * x.grn.length + 10 * x.yel.length + 1 * x.gry.length
 -}
 
-(grn_weight, yel_weight, gry_weight) = (100,10,1)
+(grn_w, yel_w, gry_w) = (100,10,1)
 
 w_uv :: Wordle -> Int
-w_uv (Wordle c_g grn yel gry) = (grn_weight * length grn) + (yel_weight * length yel) + (gry_weight * length gry)
-
--- Generate a new wordle Guess based on grn yel and gry
--- TODO: IMPLEMENT NON TRIVIAL SOLUTION
-new_guess :: String -> [(Char, Int)] -> String -> String -> Int -> String
-new_guess c_g grn yel gry t
-  -- Wordle is already solved
-  | length grn == wordle_size = error "you already solved the wordle!"
-  -- More than one turn left
-  | t > 1 = mtotl c_g grn yel gry
-  -- Exactly one turn left
-  | t == 1 = eotl c_g grn yel gry
-  | otherwise = error "invalid turns!"
-
-mtotl :: String -> [(Char, Int)] -> String -> String -> String
-mtotl c_g grn yel gry =
-  -- Characters we can use in our guess
-  let pool = ['a' .. 'z']
-      -- Last pass:
-      s = [p | p <- pool, not (elem p gry) && not (elem p c_g)]
-  in
-    take 5 s
-  
-eotl :: String -> [(Char, Int)] -> String -> String -> String
-
-eotl c_g grn yel gry
--- if there are characters in yellow that arent in green, use those in your guess
-  | any (\y -> not (tupleElem y grn)) yel = case grn of
-      ((c,i) : t) -> undefined
-      [] -> 
-  | otherwise = undefined
-  
--- Execute the current guess for the game
-guess :: Game -> Game
-guess (Game (Wordle c_g old_grn old_yel old_gry) k t) | t >= 0 =
-  let (new_grn,new_yel,new_gry) = (comp c_g k)
-      new_grn' = old_grn++new_grn
-      new_yel' = old_yel++new_yel
-      new_gry' = old_gry++new_gry
-      n_g = new_guess c_g new_grn' new_yel' new_gry' t
-  in
-    (Game (Wordle n_g new_grn' new_yel' new_gry') k (t-1))
-  | otherwise = error "no turns left!"
-
--- Gets a thruple of new entries for grn yel and gry
-comp :: String -> String -> ([(Char, Int)], String, String)
-comp c_g k = (ud_grn c_g k 0, ud_yel c_g k, ud_gry c_g k)
-
-ud_grn :: String -> String -> Int -> [(Char, Int)]
-ud_grn (gh:gt) (kh:kt) i
-  | gh == kh = (gh,i) : ud_grn gt kt (i+1)
-  | not (gh == kh) = ud_grn gt kt (i+1)
-ud_grn _ _ _ = []
-
-ud_yel :: String -> String -> String
-ud_yel c_g k = [c | c <- c_g, elem c k]
-
-ud_gry :: String -> String -> String
-ud_gry c_g k = [c | c <- c_g, not (elem c k)]
+w_uv (Wordle c_g grn yel gry pool) =
+  (grn_w * length grn) + (yel_w * length yel) + (gry_w * length gry)
 
 
-makeLenses ''Wordle
-makeLenses ''Game
-
-
-
----------- TESTING ------------
 
 {-
 What neighborhood function should we use for this example? For these wordles, I will define a neighborhood function that produces all guesses that are one character off from the current guess of the input wordle. These neighboring Wordles have not actually guessed the new string yet; it is their *upcoming* guess.
 -}
 
 w_nb :: Wordle -> [Wordle]
-w_nb w@(Wordle c_g grn yel gry) = [(Wordle s grn yel gry) | s <- string_nb c_g]
+w_nb w@(Wordle c_g grn yel gry pool) = [(Wordle s grn yel gry pool) | s <- string_nb c_g]
 
 string_nb :: String -> [String]
 string_nb s =
@@ -128,15 +157,7 @@ string_nb s =
   let rep_w = map (\c1 -> (c1,[c2 | c2 <- ['a' .. 'z'], not (c1 == c2)])) s in
     [l | (c,l) <- rep_w] -- TODO: NEEDS FIXING
 
-
--- A default Wordle to test with
-def_w :: Wordle
-def_w = Wordle "haskl" [] [] []
-
--- A default Game to test with
-def_g :: Game
-def_g = Game def_w "cabal" 5
-
+{-
 gen_str :: Int -> Gen [Char]
 gen_str i = vectorOf i (choose ('a', 'z'))
 
@@ -219,3 +240,4 @@ testAll = do
   quickCheck prop_nbsValid
   quickCheck prop_guessValid
   quickCheck prop_newGuessValid
+-}

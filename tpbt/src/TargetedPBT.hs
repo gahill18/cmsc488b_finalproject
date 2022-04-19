@@ -15,6 +15,7 @@ Caveat emptor.
 module TargetedPBT where
 
 import Data.List
+import Data.List.Utils
 import Test.QuickCheck
 
 
@@ -110,9 +111,23 @@ tupleMin ((a,b):t) = let (a',b') = tupleMin t in
   if b > b' then (a',b')
   else (a,b)
 
+-- Checks if a value is in any first member of a tuple
 tupleElem :: Eq b => b -> [(b,a)] -> Bool
 tupleElem b [] = False
 tupleElem b1 ((b2,a) : t) = b1 == b2 || tupleElem b2 t
+
+-- sorts by the second element of the tuples
+sndSort :: Ord b => [(a,b)] -> [(a,b)]
+sndSort [] = []
+sndSort [x] = [x]
+sndSort (h:t) = x : (sndSort t) where
+  x = tupleMin t
+
+-- returns the list of all tuple with unique first values
+uniq_a :: Eq a => [(a, b)] -> [(a,b)]
+uniq_a ((a,b) : t) =
+  if elem a (keysAL t) then uniq_a t
+  else (a,b) : (uniq_a t)
 
 {-
 Takes a uv function, a neighborhood (wiggle) function, an initial guess,

@@ -20,9 +20,9 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/tpbt#readme>
 
 dependencies:
+- MissingH >= 1.4.2
 - base >= 4.7 && < 5
 - QuickCheck >= 2.14.1
-- lens >= 5.0.1
 
 library:
   source-dirs: src
