@@ -38,15 +38,14 @@ wordle_size = 5
 game_turns :: Game -> Int -> Game
 game_turns g i | i > 1 = game_turns (game_turn g) (i-1)
                | i == 1 = game_turn g
+               | otherwise = error "Invalid number of game_turns!"
 
 -- Steps through one turn of the game
 game_turn :: Game -> Game
 game_turn g = new_guess (guess g)
 
 -- Pick a new guess based on current known info
--- Key hidden to enforce no peeking
 -- DOES NOT decrease turns
--- TODO
 new_guess :: Game -> Game
 new_guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
   | length grn == wordle_size = error "Wordle already solved!"
@@ -54,38 +53,49 @@ new_guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
   | t == 1 = (Game (final_guess w) k 0)
   | otherwise = g
 
-
+-- Pick a new guess that would be acceptable for a nonfinal guess
 non_final_guess :: Wordle -> Wordle
 non_final_guess w@(Wordle c_g grn yel gry pool)
+  -- At least (wordle_size) chars have not yet been guessed
   | length gry <= 26 - wordle_size =
-      let n_g_pool = [c | c <- pool, not (elem c gry)]
+      let n_g_pool = [c | c <- pool,
+                          not (elem c gry),
+                          not (elem c c_g),
+                          not (elem c (keysAL yel))]
           n_g = take wordle_size n_g_pool
       in
         (Wordle n_g grn yel gry pool)
-  | length yel >= 0 =
-      let n_g_pool = [c | c <- pool, not (elem c gry)]
-          uniq_yel = nub (keysAL yel)
+  -- There are still unguessed chars
+  | length gry < 26 =
+      let uniq_yel = nub (keysAL yel)
           uniq_grn = keysAL grn
-          n_g = take wordle_size (n_g_pool ++ uniq_yel ++ uniq_grn)
+          uniq_pool = [c | c <- pool,
+                          not (elem c gry),
+                          not (elem c uniq_grn),
+                          not (elem c uniq_yel)]
+          n_g = take wordle_size (uniq_pool ++ uniq_yel ++ uniq_grn)
       in
         (Wordle n_g grn yel gry pool)
-  | otherwise = w
+  -- No unguessed chars, finalize the wordle
+  | otherwise = final_guess w
           
-
+-- Guess the word that makes the most sense with all the current info
 final_guess :: Wordle -> Wordle
 final_guess (Wordle c_g grn yel gry pool)
-  | length yel >= 0 =
-    let use_yel = if length (nub $ keysAL yel) > 1 then
-                    take (wordle_size - length grn) (uniq_a yel)
-                  else
-                    take (wordle_size - length grn) yel
-        n_g     = keysAL (sndSort (use_yel ++ grn))
-    in
-      (Wordle n_g grn yel gry pool)
+  | length yel > 0 = (Wordle (f_g_comb grn yel) grn yel gry pool)
+  | otherwise = error "correct guess up to chance!"
+
+-- combine final guess
+f_g_comb :: [(Char, Int)] -> [(Char, Int)] -> String
+f_g_comb g@((gc,gi):gt) y@((yc,yi):yt) =
+  if gi < yi then
+    gc : (f_g_comb gt y)
+  else
+    yc : (f_g_comb g yt)
+f_g_comb _ _ = []
 
 -- Execute the current guess for the game
 -- DOES decrease turns
--- TODO
 guess :: Game -> Game
 guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
   | t > 0 =
@@ -114,7 +124,7 @@ ud_yel g k i grn gry =
   in
     [(c,i) | c <- g, i <- [0 .. wordle_size],
              elem c k && not (elem i known_i),
-             (countElem c known_chars <= countElem c k)]
+             (countElem c known_chars < countElem c k)]
 
 ud_gry :: String -> String -> [Char]
 ud_gry g k = filter (\c -> not (elem c k)) g 
