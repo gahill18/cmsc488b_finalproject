@@ -21,7 +21,7 @@ import Control.Monad
 data Wordle = Wordle {
     _c_g         :: String,        -- what we are about to guess
     _grn         :: [(Char, Int)], -- chars we know the position of
-    _yel         :: [(Char, Int)], -- chars we know exist outside of given positions
+    _yel         :: [(Char, Int)], -- chars we know exist with indexes that are not correct
     _gry         :: [Char],        -- chars not in the key
     _pool        :: [Char]         -- chars left to use
 } deriving (Eq, Show)
@@ -34,6 +34,14 @@ data Game = Game {
 
 wordle_size :: Int
 wordle_size = 5
+
+-- If any of the conditions in the list are met, then you can solve the
+-- wordle immediately
+w_solveable :: Wordle -> Bool
+w_solveable (Wordle c_g grn yel gry pool) = or [
+    length grn == wordle_size
+  , (wordle_size - (length grn) <= length yel) && length yel <= 2
+  ]
 
 game_turns :: Game -> Int -> Game
 game_turns g i | i > 1 = game_turns (game_turn g) (i-1)
@@ -48,51 +56,71 @@ game_turn g = new_guess (guess g)
 -- DOES NOT decrease turns
 new_guess :: Game -> Game
 new_guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
-  | length grn == wordle_size = error "Wordle already solved!"
+  | w_solveable w = g
   | t > 1 = (Game (non_final_guess w) k t)
-  | t == 1 = (Game (final_guess w) k 0)
+  | t == 1 = (Game (final_guess w) k t)
   | otherwise = g
 
 -- Pick a new guess that would be acceptable for a nonfinal guess
 non_final_guess :: Wordle -> Wordle
 non_final_guess w@(Wordle c_g grn yel gry pool)
   -- At least (wordle_size) chars have not yet been guessed
-  | length gry <= 26 - wordle_size =
+  | (length gry) <= 26 - wordle_size =
       let n_g_pool = [c | c <- pool,
                           not (elem c gry),
                           not (elem c c_g),
                           not (elem c (keysAL yel))]
-          n_g = take wordle_size n_g_pool
+          n_g = take wordle_size (n_g_pool ++ keysAL yel)
       in
         (Wordle n_g grn yel gry pool)
   -- There are still unguessed chars
-  | length gry < 26 =
-      let uniq_yel = nub (keysAL yel)
-          uniq_grn = keysAL grn
+  | (length gry) < 26 =
+      let uniq_yel = nub $ keysAL yel
+          uniq_grn = nub $ keysAL grn
           uniq_pool = [c | c <- pool,
                           not (elem c gry),
                           not (elem c uniq_grn),
                           not (elem c uniq_yel)]
           n_g = take wordle_size (uniq_pool ++ uniq_yel ++ uniq_grn)
       in
-        (Wordle n_g grn yel gry pool)
-  -- No unguessed chars, finalize the wordle
+        (Wordle n_g grn yel gry pool) 
+  -- No unknowns, finalize the wordle
   | otherwise = final_guess w
           
 -- Guess the word that makes the most sense with all the current info
 final_guess :: Wordle -> Wordle
 final_guess (Wordle c_g grn yel gry pool)
-  | length yel > 0 = (Wordle (f_g_comb grn yel) grn yel gry pool)
+  | length yel > 0 = (Wordle (f_g_comb grn yel pool) grn yel gry pool)
   | otherwise = error "correct guess up to chance!"
 
+f_g_comb :: [(Char, Int)] -> [(Char, Int)] -> [Char] -> String
+f_g_comb = f_g_comb' 0
+
 -- combine final guess
-f_g_comb :: [(Char, Int)] -> [(Char, Int)] -> String
-f_g_comb g@((gc,gi):gt) y@((yc,yi):yt) =
-  if gi < yi then
-    gc : (f_g_comb gt y)
-  else
-    yc : (f_g_comb g yt)
-f_g_comb _ _ = []
+f_g_comb' :: Int -> [(Char, Int)] -> [(Char, Int)] -> [Char] -> String
+f_g_comb' i g@((gc,gi):gt) y@((yc,yi):yt) p@(ph:pt) | i < wordle_size =
+    if i == gi then
+      gc : (f_g_comb' (i+1) gt y p)
+    else if not (yc == yi)  then
+      yc : (f_g_comb' (i+1) g yt p)
+    else
+      ph : (f_g_comb' (i+1) g y pt)
+
+f_g_comb' i g@((gc,gi):gt) [] p@(ph:pt) | i < wordle_size =
+    if i == gi then
+      gc : (f_g_comb' (i+1) gt [] p)
+    else
+      ph : (f_g_comb' (i+1) g [] pt)
+
+f_g_comb' i [] y@((yc,yi):yt) p@(ph:pt) | i < wordle_size =
+    if i == yi then
+      ph : (f_g_comb' (i+1) [] y pt)
+    else
+      yc : (f_g_comb' (i+1) [] yt p)
+      
+f_g_comb' i _ _ p = take (wordle_size - i) p
+
+
 
 -- Execute the current guess for the game
 -- DOES decrease turns
@@ -100,12 +128,12 @@ guess :: Game -> Game
 guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
   | t > 0 =
     let new_grn  = nub $ grn ++ (ud_grn c_g k 0) 
-        new_gry  = nub $ gry ++ (ud_gry c_g k)
-        new_yel  = nub $ yel ++ (ud_yel c_g k 0 new_grn new_gry)        
+        new_gry  = sort . nub $ gry ++ (ud_gry c_g k)
+        new_yel  = nub $ yel ++ (ud_yel c_g k k 0)
         new_pool = [p | p <- pool, not (elem p new_gry)]
     in
       Game (Wordle c_g new_grn new_yel new_gry new_pool) k (t-1)
-  | otherwise = g
+  | otherwise = g -- no turns left, no change
 
 
 -- For a guess/key pair and starting index, produce the list of matching chars with index
@@ -115,17 +143,13 @@ ud_grn (gh:gt) (kh:kt) i =
   else (ud_grn gt kt (i+1))
 ud_grn _ _ _ = []
 
--- For a guess/key pair and starting index, produce the list of chars that are in the
--- key but not in the correct position
-ud_yel :: String -> String -> Int -> [(Char, Int)] -> [Char] -> [(Char, Int)]
-ud_yel g k i grn gry =
-  let known_chars = map fst grn
-      known_i     = map snd grn
-  in
-    [(c,i) | c <- g, i <- [0 .. wordle_size],
-             elem c k && not (elem i known_i),
-             (countElem c known_chars < countElem c k)]
-
+-- For a guess/key pair and starting index, produce the list of chars that are in the key but not in the correct position, stored as (char, wrong index)
+ud_yel :: String -> String -> String -> Int -> [(Char, Int)]
+ud_yel (gh:gt) (kh:kt) k i =
+  if elem gh k && not (gh == kh) then (gh,i) : (ud_yel gt kt k (i+1))
+  else (ud_yel gt kt k (i+1))
+ud_yel _ _ _ _ = []
+  
 ud_gry :: String -> String -> [Char]
 ud_gry g k = filter (\c -> not (elem c k)) g 
 
@@ -134,11 +158,11 @@ ud_gry g k = filter (\c -> not (elem c k)) g
 
 -- A default Wordle to test with
 def_w :: Wordle
-def_w = Wordle "haskl" [] [] [] ['a' .. 'z']
+def_w = Wordle "tails" [] [] [] ['a' .. 'z']
 
 -- A default Game to test with
 def_g :: Game
-def_g = Game def_w "cabal" 5
+def_g = Game def_w "cabal" 10
 
 {-
 What utility value function should we use for this example? For these wordles, I will define a reward function
