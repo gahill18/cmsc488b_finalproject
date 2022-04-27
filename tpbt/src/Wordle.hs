@@ -4,6 +4,12 @@ Garrett Hill
 CMSC488B
 Spring 2022
 
+A significant portions of this Wordle representation was taken directly from the following haskell project:
+  https://github.com/ivanjermakov/wordle
+All property testing is my own
+
+
+
 -}
 
 module Wordle where
@@ -18,6 +24,7 @@ import Control.Monad
 
 ------------- DEFINITIONS/ENGINE ----------------
 
+<<<<<<< HEAD
 data Wordle = Wordle {
     _c_g         :: String,        -- what we are about to guess
     _grn         :: [(Char, Int)], -- chars we know the position of
@@ -25,16 +32,15 @@ data Wordle = Wordle {
     _gry         :: [Char],        -- chars not in the key
     _pool        :: [Char]         -- chars left to use
 } deriving (Eq, Show)
+=======
+>>>>>>> 6f3ce263770140eb2bb3d07f1d7f945f3c984721
 
-data Game = Game {
-    _wordle      :: Wordle, -- the wordle trying to guess the key
-    _key         :: String, -- the key the wordle is trying to guess
-    _turns       :: Int     -- how many turns are left
-} deriving (Eq, Show)
+data GuessType = Default | NotInWord | WrongSpot | CorrectSpot
+  deriving (Show, Read, Eq, Ord)
 
-wordle_size :: Int
-wordle_size = 5
+type Guess = [(Char, GuessType)]
 
+<<<<<<< HEAD
 -- If any of the conditions in the list are met, then you can solve the
 -- wordle immediately
 w_solveable :: Wordle -> Bool
@@ -47,11 +53,17 @@ game_turns :: Game -> Int -> Game
 game_turns g i | i > 1 = game_turns (game_turn g) (i-1)
                | i == 1 = game_turn g
                | otherwise = error "Invalid number of game_turns!"
+=======
+data GameStatus = Win | Loss | Ongoing
+  deriving (Show, Read, Eq, Ord)
+>>>>>>> 6f3ce263770140eb2bb3d07f1d7f945f3c984721
 
--- Steps through one turn of the game
-game_turn :: Game -> Game
-game_turn g = new_guess (guess g)
+data Wordle = W {
+    pst_g       :: [Guess]  -- Past guesses
+  , pos_g       :: [String] -- All possible guesses
+} deriving (Eq, Show, Ord)
 
+<<<<<<< HEAD
 -- Pick a new guess based on current known info
 -- DOES NOT decrease turns
 new_guess :: Game -> Game
@@ -134,8 +146,48 @@ guess g@(Game w@(Wordle c_g grn yel gry pool) k t)
     in
       Game (Wordle c_g new_grn new_yel new_gry new_pool) k (t-1)
   | otherwise = g -- no turns left, no change
+=======
+data Engine = E {
+    t         :: Int     -- Turns left
+  , k         :: String  -- Key to the wordle
+} deriving (Eq, Show, Ord)
 
+-- The player gives its guess to the engine so the engine can tell the player
+-- how well it did (the player ideally never sees k)
+askEngine :: Engine -> String -> Guess
+askEngine (E t k) g | t > 0 = guess g k
+askEngine _ _ = []
 
+-- Determine what information to give back to the player
+guess :: String -> String -> Guess
+guess gWord tWord = foldl f [] $ zip gWord tWord
+  where
+    f :: Guess -> (Char, Char) -> Guess
+    f acc (g, t) = acc ++ [(g, guessType)]
+      where
+        guessType
+          | g == t = CorrectSpot
+          | targetTotal g - correctTotal g - wrongBefore g > 0 = WrongSpot
+          | otherwise = NotInWord
+        wrongBefore c = length . filter (== c) . map fst . filter ((== WrongSpot) . snd) $ acc
+        targetTotal c = length . filter (== c) $ tWord
+        correctTotal c = length . filter (\(a, b) -> a == c && b == c) $ zip gWord tWord
+
+-- Check that our guessing code satisfies the properties we want it to
+prop_correctSpotValid :: String -> Property
+prop_correctSpotsValid s
+  | length s > 0 = let cg = guess s s in counterexample "s on s is always correct" $
+    any (\(a,b) -> case b of
+            CorrectSpot -> True
+            _ -> False
+        ) cg
+  | otherwise = counterexample "" True
+>>>>>>> 6f3ce263770140eb2bb3d07f1d7f945f3c984721
+
+prop_WrongSpotValid :: String -> Property
+prop_wrongSpotsValid s = undefined
+
+<<<<<<< HEAD
 -- For a guess/key pair and starting index, produce the list of matching chars with index
 ud_grn :: String -> String -> Int -> [(Char, Int)]
 ud_grn (gh:gt) (kh:kt) i =
@@ -275,3 +327,7 @@ testAll = do
   quickCheck prop_guessValid
   quickCheck prop_newGuessValid
 -}
+=======
+prop_NotInWordValid :: String -> Property
+prop_NotInWordValid s = undefined
+>>>>>>> 6f3ce263770140eb2bb3d07f1d7f945f3c984721
