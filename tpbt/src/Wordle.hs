@@ -5,10 +5,16 @@ CMSC488B
 Spring 2022
 
 ------------------ DISCLAIMERS --------------------
-This example uses suboptimal algorithms that would likely slow down
-significantly for larger data sets.
-It serves more as a proof of concept that is readable and PROVABLY correct
+
+This demonstration heavily utilizes code from the following repository:
+https://github.com/ivanjermakov/wordle
+Please refer to src/Engine.hs in particular.
+
+This example uses suboptimal algorithms that will slow down significantly
+for larger data sets. For example, only the 10k and official Wordle word sets are able to run on my machine without hanging.
+It serves more as a proof of concept that is readable and PROVABLY [in]correct
 within user defined margins.
+
 Caveat emptor.
 
 -}
@@ -40,7 +46,7 @@ data GameStatus = Win | Loss | Ongoing
 
 {- The official list of Wordle keys -}
 get_pool path = unsafePerformIO . readFile $ path
-w_pool = lines $ get_pool "reference_dict/official.txt"
+w_pool        = lines $ get_pool "reference_dict/official.txt"
 
 {- Datatype to store past guesses and possible words left to guess -}
 data Wordle = W {
@@ -55,33 +61,45 @@ data Veil = V {
   , turns     :: Int
   } deriving (Show, Read, Eq, Ord)
 
-{- Default Wordle -}
+{- Default Wordle and Veil for testing -}
 def_w :: Wordle
 def_w = (W [] w_pool)
 
+def_v :: Veil
+def_v = (V def_w "cabal" 5)
+
 {-
 Generating "complex" arbitrary wordles is impossible due to not being
-able to make any guesses
+able to make any guesses.
 -}
 instance Arbitrary Wordle where
   arbitrary = return def_w
   shrink (W (g:gs) wp) = []
 
+{-
+All we know how to test until we define more complex actions
+-}
 prop_wValid :: Wordle -> Bool
-prop_wValid w@(W gs wp) = length gs <= 5 
+prop_wValid w@(W gs wp) = length gs <= 5 && length wp <= length w_pool
 
 {-
-Veils will be the primary testing datatype as they can actually take
-turns
+Veils will be the primary testing datatype as they can actually take turns.
+Note that this example intentionally defines arbitrary veils as randomly
+guessing for each turn.
+This random incompetance means that we should (usually) not have enough
+guesses left to be able to solve random Veils
 -}
 instance Arbitrary Veil where
   arbitrary = do
       init@(V w k t) <- V <$> (return def_w) <*> elements w_pool <*> return 5
       turns <- elements [0 .. 5]
-      -- get list of non-evaled functions that would pick from w_pool
       arb_turns init turns
   shrink _ = []
 
+{-
+For a given veil, executes the number of turns by randomly guessing from the
+remaining word pool
+-}
 arb_turns :: Veil -> Int -> Gen Veil
 arb_turns v@(V w@(W gs wp) k t) i
   | solveable v = return v
@@ -90,18 +108,17 @@ arb_turns v@(V w@(W gs wp) k t) i
       arb_turns (veilTurn new_guess v) (i-1)
   | otherwise = return v
 
+{-
+For a given veil, returns whether that veil satisfies a list of validity
+conditions
+-}
 prop_vValid :: Veil -> Bool
-prop_vValid v@(V w k t) = (length k == 5) && (t <= 5) && prop_wValid w
+prop_vValid v@(V w k t) = and val_cons
+  where
+    val_cons = (length k == 5) : (t <= 5) : (prop_wValid w) : []
 
 
 ---------------- FUNCTIONS ------------------
-
-veilTurns :: Int -> [String] -> Veil -> Veil
-veilTurns i (s:ss) v@(V w@(W gs wp) k t)
-  | solveable v = v
-  | i == 1 = veilTurn s v
-  | i >= 2 = veilTurns (i-1) ss (veilTurn s v)
-veilTurns i ss v = v
 
 {- Pass a string to a veil to guess, and returned the updated veil -}
 veilTurn :: String -> Veil -> Veil
@@ -113,8 +130,9 @@ veilTurn s v@(V w@(W gs wp) k t)
       (V (W new_gs (trimPool new_gs wp)) k (t-1))
   | otherwise = v -- no more turns, do nothing
 
-{-
+{- NOTE: COMES VERBATIM FROM GITHUB CITED ABOVE
 Takes a guess and key, and produces the necessary feedback to the user.
+
 -}
 guess :: String -> String -> Guess
 guess gWord tWord = foldl f [] $ zip gWord tWord
@@ -172,22 +190,6 @@ prop_poolValid v@(V w@(W gs wp) k t) =
 ------------------ TARGETED PBT --------------------
 
 {-
-For a given wordle, produces the list of all Wordles that have had one
-additional word guessed. The additional word is determined by the values
-in the remaining word pool.
--}
-w_nb :: Wordle -> String -> [Wordle]
-w_nb w@(W gs wp) tWord =
-  let new_pool = trimPool gs wp
-      new_gs   = [guess gWord tWord | gWord <- new_pool]
-  in
-    [(W (new_g : gs) new_pool) | new_g <- new_gs]
-
-v_nb :: Veil -> [Veil]
-v_nb v@(V w@(W gs wp) k t) = let new_ws = w_nb w k in
-  [(V new_w k (t-1)) | new_w <- new_ws]
-
-{-
 Produces a utility value by comparing the length of the wordle's pool
 to the length of the total word pool
 
@@ -202,6 +204,44 @@ Wordle
 -}
 v_uv :: Veil -> Int
 v_uv v@(V w@(W gs wp) k t) = w_uv w
+
+{-
+-}
+v_uv' :: Veil -> Int
+v_uv' v@(V w@(W gs wp) k t) = (w_uv w) `div` t
+
+{-
+For a given wordle, produces the list of all Wordles that have had one
+additional word guessed. The additional word is determined by the values
+in the remaining word pool.
+-}
+w_nb :: Wordle -> String -> [Wordle]
+w_nb w@(W gs wp) tWord =
+  let new_pool = trimPool gs wp
+      new_gs   = [guess gWord tWord | gWord <- new_pool]
+  in
+    [(W (new_g : gs) new_pool) | new_g <- new_gs]
+
+{-
+For a given veil, produces the list of all unique veils with one additional
+valid word guessed
+-}
+v_nb :: Veil -> [Veil]
+v_nb v@(V w@(W gs wp) k t) = let new_ws = w_nb w k in
+  [(V new_w k (t-1)) | new_w <- new_ws]  
+
+{-
+Experimental neighborhood algorithm designed to reduce the guesses to only those
+that eliminate a significant portion of results
+-}
+v_nb' :: Veil -> [Veil]
+v_nb' v@(V w@(W gs wp) k t) =
+  let new_pool = trimPool gs wp
+      new_gs   = [guess g k | g <- new_pool]
+      new_ws   = [(W (new_g : gs) new_pool) | new_g <- new_gs]
+      new_vs   = [(V new_w k (t-1)) | new_w <- new_ws]
+  in
+    filter (\new_v -> v_uv' new_v <= v_uv' v) new_vs
 
 {-
 returns if a given veil is solveable in i turns
@@ -233,14 +273,16 @@ minUVUnder acceptableRisk
 
 Both should produce counterexamples for the same property, but tqc should be
 significantly faster
-
-On my machine,
-tqc_solveable takes (0.14 secs, 25,552,648 bytes) to find a counterexample
-prop_solveableIn takes (101.87 secs, 44,426,540,840 bytes)
 -}
 
 prop_solveableIn :: IO ()
 prop_solveableIn = quickCheck (counterexample "solveable" $ solveableIn 5)
+-- prop_solveableIn takes (101.87 secs, 44,426,540,840 bytes)
 
 tqc_solveableIn :: IO ()
 tqc_solveableIn = minUVUnder v_uv v_nb acceptableRisk 5
+-- always below 0.2 seconds and 40,000,000 bytes
+
+tqc_solveableIn' :: IO ()
+tqc_solveableIn' = minUVUnder v_uv' v_nb' acceptableRisk 5
+-- always below 0.2 seconds and 40,000,000 bytes
