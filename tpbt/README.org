@@ -11,5 +11,5 @@
    3. use a user-provided utility function 
 
 * Usage
-fLyMd-mAkEr
+
 * Examples
