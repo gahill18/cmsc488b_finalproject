@@ -1,30 +1,33 @@
 
 # Table of Contents
 
-1.  [Introduction](#orgd364820)
-2.  [Usage](#org2840e3c)
-3.  [Examples](#org33b8866)
+1.  [Introduction](#orgd1ec990)
+2.  [Usage](#org7cc3368)
+3.  [Examples](#org574f5bf)
 
 
 
-<a id="orgd364820"></a>
+<a id="orgd1ec990"></a>
 
 # Introduction
 
 Targeted property based testing, or t-PBT, is a library designed to make property based testing with quickCheck produce counterexamples to defined properties more efficiently. It does so in the following steps:
 
-1.  use quickCheck's arbitrary to define a starting point
-    (users can define their own arbitrary instaces for non-prelude types)
+1.  use quickCheck's arbitrary to define a starting point (users can define their own arbitrary instaces for non-prelude types)
 2.  use a user-provided neighborhood function to get a list of nearby points
-3.  use a user-provided utility function
+3.  use a user-provided utility function to search for a local min or max
+4.  if the value of the local min or max violates the property you are looking for, congratulations you have a counterexample!
+    otherwise, take the local min or max and repeat steps 2 through 4 until either
+    a. the difference between iterations is too small to be meaningful
+    b. you run out of "gas", which the user defines as the number of iterations before quitting
 
 
-<a id="org2840e3c"></a>
+<a id="org7cc3368"></a>
 
 # Usage
 
 
-<a id="org33b8866"></a>
+<a id="org574f5bf"></a>
 
 # Examples
 
