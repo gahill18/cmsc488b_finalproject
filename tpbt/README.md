@@ -1,13 +1,13 @@
 
 # Table of Contents
 
-1.  [Introduction](#org92a3fe0)
-2.  [Usage](#org3c10cb0)
-3.  [Examples](#org9fc2ab9)
+1.  [Introduction](#org405376b)
+2.  [Usage](#org7c7b27f)
+3.  [Examples](#orgd676f36)
 
 
 
-<a id="org92a3fe0"></a>
+<a id="org405376b"></a>
 
 # Introduction
 
@@ -24,16 +24,17 @@ Targeted property based testing, or t-PBT, is a library designed to make propert
     b. you run out of "gas", which the user defines as the number of iterations before quitting
 
 
-<a id="org3c10cb0"></a>
+<a id="org7c7b27f"></a>
 
 # Usage
 
 The TargetedPBT module has four primary functions for t-PBT:
 
-1.  maxUVover    :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
-2.  maxUVUnder   :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
-3.  minUVOver    :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
-4.  minUVUnder   :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
+    
+    maxUVover    :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
+    maxUVUnder   :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
+    minUVOver    :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
+    minUVUnder   :: (Show a, Arbitrary a , Ord b) => (a -> b) -> (a -> [a]) -> b -> Int -> IO ()
 
 These functions take the appropriate user defined functions and perform the steps listed above for each arbitrary starting point produced by quickCheck
 
@@ -52,7 +53,7 @@ Int        is the gas, or number of iterations you want to search before quittin
 IO ()      is the same as the output of quickCheck, because it IS the output of a quickCheck
 
 
-<a id="org9fc2ab9"></a>
+<a id="orgd676f36"></a>
 
 # Examples
 
