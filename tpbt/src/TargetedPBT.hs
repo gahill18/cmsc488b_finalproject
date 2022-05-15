@@ -120,7 +120,9 @@ minimize f_uv f_wiggle init =
   let is = f_wiggle init
       uvs = map f_uv is
       l = zip is uvs
-  in tupleMin l
+  in case is of
+    []   -> (init, f_uv init)
+    i:ii -> tupleMin l
 
 {-
 Takes in a list of tuples, of which the second type needs to be orderable in order to sort.
