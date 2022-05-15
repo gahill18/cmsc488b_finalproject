@@ -59,3 +59,4 @@ IO ()      is the same as the output of quickCheck, because it IS the output of 
 
 Aside from the very basic example given in TargetedPBT.hs, a demonsration of using t-PBT on arbitrary Wordle gamestates is given in Wordle.hs
 
+To run this example, just type "stack run" in the commandline from the tpbt/ directory.
