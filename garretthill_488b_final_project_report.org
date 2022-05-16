@@ -1,0 +1,24 @@
+#+TITLE: CMSC488B Final Project Report
+#+OPTIONS: toc:nil
+
+• Group members: _Garrett Hill_
+
+• Github ids: _gahill18_
+
+• Project title: _Targeted Property Based Testing in Haskell_
+
+** What did you accomplish in your final project?
+
+   I took the previously established technique known as Targeted Property Pased Testing (tPBT) and implemented a library to assist end users in utilizing said technique. The library builds on top of the existing QuickCheck implementation. This library is capable of finding counterexamples to defined properties in fewer tests than traditional random PBT, on average. In order to use this library on a user defined typeclass, end users must defined a utility function, neighborhood function, and property to test. An non-trivial example of an end-use case is demonstrated in the Wordle module, which uses tPBT to demonstrate how guessing random valid words is not a viable way to solve Wordles.
+
+** How (if at all) did your project scope change from your proposal? Explain what changed and why.
+
+   Blah
+   
+** What was the biggest hurdle you encountered? A small description of the hardest unforeseen (or foreseen) difficulty
+
+   Blah
+
+** Anything else you’d like to add?
+
+   Blah
